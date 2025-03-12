@@ -188,3 +188,40 @@ st.sidebar.info(
     "Esta aplicação usa LangChain para analisar dados de várias fontes. "
     "Configure o provedor de IA, a fonte de dados e o formato de saída para começar."
 )
+
+
+# Importa o processador adaptativo
+from data_processors.adaptive_processor import process_adaptive
+
+# Atualização da função para processar arquivos CSV
+def process_uploaded_csv(uploaded_file):
+    """Processa um arquivo CSV carregado."""
+    try:
+        # Usa o processador adaptativo
+        df = process_adaptive(uploaded_file.name, uploaded_file)
+        return df
+    except Exception as e:
+        st.error(f"Erro ao processar o arquivo CSV: {e}")
+        return None
+
+# Atualização da função para processar arquivos Excel
+def process_uploaded_excel(uploaded_file):
+    """Processa um arquivo Excel carregado."""
+    try:
+        # Usa o processador adaptativo
+        df = process_adaptive(uploaded_file.name, uploaded_file)
+        return df
+    except Exception as e:
+        st.error(f"Erro ao processar o arquivo Excel: {e}")
+        return None
+
+# Atualização da função para processar arquivos XML
+def process_uploaded_xml(uploaded_file):
+    """Processa um arquivo XML carregado."""
+    try:
+        # Usa o processador adaptativo
+        df = process_adaptive(uploaded_file.name, uploaded_file)
+        return df
+    except Exception as e:
+        st.error(f"Erro ao processar o arquivo XML: {e}")
+        return None

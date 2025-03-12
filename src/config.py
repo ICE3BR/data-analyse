@@ -42,3 +42,16 @@ def get_ai_config(provider_type="api"):
     
     else:
         raise ValueError(f"Tipo de provedor não suportado: {provider_type}")
+
+
+def get_visualization_config():
+    """
+    Obtém a configuração para visualizações.
+    
+    Returns:
+        dict: Dicionário de configuração para visualizações
+    """
+    return {
+        "use_plotly": os.getenv("DEFAULT_USE_PLOTLY", "false").lower() == "true",
+        "output_format": os.getenv("DEFAULT_OUTPUT_FORMAT", "texto").lower(),
+    }

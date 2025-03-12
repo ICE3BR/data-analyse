@@ -43,6 +43,7 @@ class DataFrameAnalyzer:
         self.output_format = output_format
         self.system_prompt = get_system_prompt(output_format)
     
+    # Atualização do método load_dataframe para lidar com datasets grandes
     def load_dataframe(self, df: pd.DataFrame):
         """
         Carrega um DataFrame para análise.
@@ -51,6 +52,11 @@ class DataFrameAnalyzer:
             df: DataFrame do pandas
         """
         self.df = df
+        
+        # Para datasets grandes, criar resumos estatísticos em vez de usar o DataFrame completo
+        if len(df) > 10000:
+            print(f"Dataset grande com {len(df)} linhas. Criando resumos estatísticos.")
+            
         # Gerar informações sobre o DataFrame
         self._generate_df_info()
     
@@ -67,6 +73,12 @@ class DataFrameAnalyzer:
             "amostra": self.df.head(5).to_dict(orient="records"),
             "descricao": self.df.describe().to_dict()
         }
+        
+        # Para datasets grandes, adicionar informações de amostragem
+        if len(self.df) > 10000:
+            info["nota"] = f"Dataset grande com {len(self.df)} linhas. Usando amostragem para análise."
+            info["amostra_aleatoria"] = self.df.sample(n=min(1000, len(self.df)), random_state=42).to_dict(orient="records")
+        
         self.df_info = info
     
     def chat(self, query: str) -> Any:
