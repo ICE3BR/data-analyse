@@ -1,6 +1,6 @@
-# Análise de Dados com PandasAI
+# Análise de Dados com LangChain
 
-Este projeto fornece uma interface web para análise de dados usando PandasAI. Permite aos usuários analisar várias fontes de dados, incluindo arquivos CSV, documentos XML, arquivos Excel e bancos de dados MySQL.
+Este projeto fornece uma interface web para análise de dados usando LangChain. Permite aos usuários analisar várias fontes de dados, incluindo arquivos CSV, documentos XML, arquivos Excel e bancos de dados MySQL.
 
 ## Funcionalidades
 
@@ -13,6 +13,11 @@ Este projeto fornece uma interface web para análise de dados usando PandasAI. P
   - Documentos XML
   - Arquivos Excel
   - Bancos de dados MySQL
+- Múltiplos formatos de saída:
+  - Texto
+  - JSON
+  - Markdown
+- System Prompts personalizáveis para controlar o comportamento da IA
 - Interface de usuário intuitiva
 - Configuração fácil para desenvolvedores
 

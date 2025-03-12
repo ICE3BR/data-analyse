@@ -1,12 +1,11 @@
 [project]
 name = "data-analyse"
 version = "0.1.0"
-description = "Ferramenta de análise de dados com PandasAI e múltiplos backends de IA"
+description = "Ferramenta de análise de dados com LangChain e múltiplos backends de IA"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "streamlit>=1.22.0",
-    "pandasai>=2.0.0",
     "pandas>=2.0.0",
     "pymysql>=1.0.3",
     "sqlalchemy>=2.0.0",
@@ -17,6 +16,8 @@ dependencies = [
     "langchain>=0.0.300",
     "langchain-community>=0.0.10",
     "langchain-ollama>=0.0.1",
+    "langchain-openai>=0.0.1",
+    "matplotlib>=3.7.0",
 ]
 
 [project.optional-dependencies]

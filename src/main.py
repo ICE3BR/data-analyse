@@ -3,10 +3,10 @@ import streamlit as st
 import pandas as pd
 from dotenv import load_dotenv
 
-# Load environment variables
+# Carrega variáveis de ambiente
 load_dotenv()
 
-# Import custom modules
+# Importa módulos personalizados
 from config import get_ai_config
 from database import get_database_connection
 from data_processors.excel_processor import process_excel
@@ -14,33 +14,34 @@ from data_processors.xml_processor import process_xml
 from data_processors.sql_processor import process_sql
 from data_processors.csv_processor import process_csv
 from ai_providers import get_ai_provider
+from langchain_analyzer import DataFrameAnalyzer  # Importa nosso novo analisador
 
-# Page configuration
+# Configuração da página
 st.set_page_config(
-    page_title="Análise de Dados com PandasAI",
+    page_title="Análise de Dados com LangChain",
     page_icon="📊",
     layout="wide"
 )
 
-# Main title
-st.title("📊 Análise de Dados com PandasAI")
+# Título principal
+st.title("📊 Análise de Dados com LangChain")
 
-# Sidebar for configuration
+# Barra lateral para configuração
 st.sidebar.title("Configurações")
 
-# AI Provider selection
+# Seleção do provedor de IA
 ai_provider_type = st.sidebar.radio(
     "Selecione o Tipo de IA",
     options=["API", "Local"],
     index=0
 )
 
-# Get AI provider based on selection
+# Obtém o provedor de IA com base na seleção
 if ai_provider_type == "API":
     ai_provider = get_ai_provider("api")
     st.sidebar.info("Usando IA baseada em API (configurada no código)")
     
-    # Display which API is being used (for developer information)
+    # Exibe qual API está sendo usada (para informação do desenvolvedor)
     api_type = os.getenv("API_TYPE", "openai")
     st.sidebar.text(f"API Atual: {api_type}")
     
@@ -48,20 +49,43 @@ else:
     ai_provider = get_ai_provider("local")
     st.sidebar.info("Usando IA Local (Ollama)")
     
-    # Display which model is being used
+    # Exibe qual modelo está sendo usado
     model_name = os.getenv("OLLAMA_MODEL", "mistral")
     st.sidebar.text(f"Modelo Atual: {model_name}")
 
-# Data source selection
+# Seleção da fonte de dados
 data_source = st.sidebar.selectbox(
     "Selecione a Fonte de Dados",
     options=["Arquivo CSV", "Arquivo Excel", "Documento XML", "Banco de Dados MySQL"]
 )
 
-# Main content area
+# Seleção do formato de saída (novo recurso)
+output_format = st.sidebar.selectbox(
+    "Formato de Saída",
+    options=["Texto", "JSON", "Markdown"],
+    index=0
+)
+
+# Opção para personalizar o System Prompt
+with st.sidebar.expander("Configurações Avançadas"):
+    use_custom_prompt = st.checkbox("Usar System Prompt personalizado")
+    
+    if use_custom_prompt:
+        from prompts.system_prompts import get_system_prompt
+        default_prompt = get_system_prompt(output_format.lower())
+        
+        custom_prompt = st.text_area(
+            "System Prompt Personalizado",
+            value=default_prompt,
+            height=300
+        )
+    else:
+        custom_prompt = None
+
+# Área de conteúdo principal
 st.header("Análise de Dados")
 
-# Handle different data sources
+# Trata diferentes fontes de dados
 df = None
 if data_source == "Arquivo CSV":
     uploaded_file = st.file_uploader("Carregar Arquivo CSV", type=["csv"])
@@ -82,11 +106,11 @@ elif data_source == "Documento XML":
         st.success("Documento XML carregado com sucesso!")
         
 elif data_source == "Banco de Dados MySQL":
-    # Database connection form
+    # Formulário de conexão com o banco de dados
     with st.expander("Conexão com o Banco de Dados"):
         st.info("Os detalhes da conexão podem ser configurados no arquivo .env ou inseridos aqui")
         
-        # Use environment variables as defaults
+        # Usa variáveis de ambiente como padrões
         default_host = os.getenv("DB_HOST", "localhost")
         default_user = os.getenv("DB_USER", "")
         default_password = os.getenv("DB_PASSWORD", "")
@@ -100,7 +124,7 @@ elif data_source == "Banco de Dados MySQL":
             password = st.text_input("Senha", value=default_password, type="password")
             database = st.text_input("Banco de Dados", value=default_database)
         
-        # SQL query input
+        # Entrada de consulta SQL
         sql_query = st.text_area("Consulta SQL", height=100)
         
         if st.button("Executar Consulta"):
@@ -113,12 +137,12 @@ elif data_source == "Banco de Dados MySQL":
             else:
                 st.warning("Por favor, insira uma consulta SQL")
 
-# Display the data if available
+# Exibe os dados se disponíveis
 if df is not None:
     st.subheader("Visualização dos Dados")
     st.dataframe(df.head())
     
-    # PandasAI analysis
+    # Análise com LangChain (substituindo PandasAI)
     st.subheader("Faça Perguntas Sobre Seus Dados")
     user_query = st.text_area("Digite sua pergunta", height=100, 
                             placeholder="Exemplo: Qual é a média da coluna X? Mostre um gráfico de Y ao longo do tempo.")
@@ -127,32 +151,40 @@ if df is not None:
         if user_query.strip():
             with st.spinner("Analisando dados..."):
                 try:
-                    # Configure PandasAI with the selected AI provider
-                    from pandasai import SmartDataframe
-                    smart_df = SmartDataframe(df, config={"llm": ai_provider})
+                    # Inicializa nosso DataFrameAnalyzer com o provedor de IA selecionado
+                    analyzer = DataFrameAnalyzer(ai_provider, output_format.lower())
+                    analyzer.load_dataframe(df)
                     
-                    # Get the response
-                    response = smart_df.chat(user_query)
+                    # Aplica system prompt personalizado se fornecido
+                    if use_custom_prompt and custom_prompt:
+                        analyzer.system_prompt = custom_prompt
                     
-                    # Display the response
-                    st.subheader("Resultado da Análise")
-                    
-                    # Handle different response types
-                    if isinstance(response, pd.DataFrame):
-                        st.dataframe(response)
-                    elif isinstance(response, str) and response.endswith((".png", ".jpg", ".jpeg")):
-                        st.image(response)
-                    else:
-                        st.write(response)
+                    # Processa com base no formato de saída selecionado
+                    if output_format == "JSON":
+                        response = analyzer.to_json(user_query)
+                        st.json(response)
+                    elif output_format == "Markdown":
+                        response = analyzer.to_markdown(user_query)
+                        st.markdown(response)
+                    else:  # Formato de texto padrão
+                        response = analyzer.chat(user_query)
+                        
+                        # Trata diferentes tipos de resposta
+                        if isinstance(response, pd.DataFrame):
+                            st.dataframe(response)
+                        elif isinstance(response, str) and response.endswith((".png", ".jpg", ".jpeg")):
+                            st.image(response)
+                        else:
+                            st.write(response)
                         
                 except Exception as e:
                     st.error(f"Erro durante a análise: {e}")
         else:
             st.warning("Por favor, digite uma pergunta para analisar os dados")
 
-# Footer
+# Rodapé
 st.sidebar.markdown("---")
 st.sidebar.info(
-    "Esta aplicação usa PandasAI para analisar dados de várias fontes. "
-    "Configure o provedor de IA e a fonte de dados para começar."
+    "Esta aplicação usa LangChain para analisar dados de várias fontes. "
+    "Configure o provedor de IA, a fonte de dados e o formato de saída para começar."
 )

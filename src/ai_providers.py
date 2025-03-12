@@ -1,12 +1,49 @@
 import os
-from config import get_ai_config
+from typing import Dict, Any
 
-# Dictionary mapping unsupported models to supported alternatives
-# Mapeamento para modelos gpt-4o e gpt-4o-mini para alternativas suportadas
+# Mapeamento de modelos para alternativas compatíveis com PandasAI
 MODEL_MAPPING = {
-    "gpt-4o": "gpt-4",        # Map gpt-4o to gpt-4
-    "gpt-4o-mini": "gpt-3.5-turbo"  # Map gpt-4o-mini to gpt-3.5-turbo
+    "gpt-4": "gpt-3.5-turbo",
+    "gpt-4-turbo": "gpt-3.5-turbo",
+    "gpt-4-vision-preview": "gpt-3.5-turbo",
 }
+
+def get_ai_config(provider_type: str) -> Dict[str, Any]:
+    """
+    Obtém a configuração para o provedor de IA especificado.
+    
+    Args:
+        provider_type (str): Tipo de provedor ('api' ou 'local')
+        
+    Returns:
+        Dict[str, Any]: Configuração do provedor
+    """
+    if provider_type == "api":
+        api_type = os.getenv("API_TYPE", "openai").lower()
+        
+        if api_type == "openai":
+            return {
+                "api_key": os.getenv("OPENAI_API_KEY", ""),
+                "model": os.getenv("OPENAI_MODEL", "gpt-3.5-turbo"),
+                "temperature": float(os.getenv("OPENAI_TEMPERATURE", "0.7")),
+            }
+        elif api_type == "deepseek":
+            return {
+                "api_key": os.getenv("DEEPSEEK_API_KEY", ""),
+                "model": os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
+                "temperature": float(os.getenv("DEEPSEEK_TEMPERATURE", "0.7")),
+            }
+        else:
+            raise ValueError(f"Tipo de API não suportado: {api_type}")
+    
+    elif provider_type == "local":
+        return {
+            "model": os.getenv("OLLAMA_MODEL", "mistral"),
+            "host": os.getenv("OLLAMA_HOST", "http://localhost:11434"),
+        }
+    
+    else:
+        raise ValueError(f"Tipo de provedor não suportado: {provider_type}")
 
 def get_ai_provider(provider_type="api"):
     """
@@ -27,24 +64,18 @@ def get_ai_provider(provider_type="api"):
         
         if api_type == "openai":
             # Importa aqui para evitar carregar dependências desnecessárias
-            from pandasai.llm import OpenAI as PandasOpenAI
+            from langchain_openai import ChatOpenAI
             
-            # Verifica se o modelo está no mapeamento e substitui se necessário
-            model = config["model"]
-            if model in MODEL_MAPPING:
-                model = MODEL_MAPPING[model]
-                print(f"Modelo {config['model']} não suportado pelo PandasAI. Usando {model} como alternativa.")
-            
-            # Cria e retorna o cliente OpenAI adaptado para PandasAI
-            return PandasOpenAI(
-                api_token=config["api_key"],
-                model=model,
+            # Cria e retorna o cliente OpenAI para LangChain
+            return ChatOpenAI(
+                api_key=config["api_key"],
+                model=config["model"],
                 temperature=config["temperature"]
             )
             
         elif api_type == "deepseek":
             # Importa aqui para evitar carregar dependências desnecessárias
-            from langchain.llms import DeepSeek
+            from langchain_community.llms import DeepSeek
             
             # Cria e retorna o cliente DeepSeek
             return DeepSeek(
@@ -66,4 +97,4 @@ def get_ai_provider(provider_type="api"):
         )
     
     else:
-        raise ValueError(f"Unsupported provider type: {provider_type}")
+        raise ValueError(f"Tipo de provedor não suportado: {provider_type}")
