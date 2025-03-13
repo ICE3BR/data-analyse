@@ -76,25 +76,49 @@ class DataFrameAnalyzer:
         
         # Coletar informações básicas
         try:
-            # Aumentar o número de amostras para garantir representatividade
-            sample_rows = min(20, len(self.df))  # Aumentado de 5 para 20
-            
-            # Converter o DataFrame para um formato serializável
-            sample_data = self.df.head(sample_rows).applymap(json_serializable).to_dict(orient="records")
-            
+            # Informações básicas sobre o DataFrame
             info = {
                 "colunas": list(self.df.columns),
                 "dimensoes": self.df.shape,
                 "tipos_dados": {col: str(dtype) for col, dtype in self.df.dtypes.items()},
-                "amostra": sample_data,
-                "total_registros": len(self.df),  # Adicionado para clareza
+                "total_registros": len(self.df),
             }
             
-            # Incluir o DataFrame completo para consultas de filtragem
-            # Isso garante que todas as linhas sejam consideradas
-            info["dados_completos"] = self.df.applymap(json_serializable).to_dict(orient="records")
+            # Incluir todos os dados para garantir consultas completas
+            # Convertemos para dicionário para facilitar a serialização
+            all_data = self.df.applymap(json_serializable).to_dict(orient="records")
+            info["dados_completos"] = all_data
             
-            # Tenta incluir estatísticas descritivas, com tratamento para tipos não numéricos
+            # Adicionar valores únicos de cada coluna para facilitar consultas de filtragem
+            # Isso ajuda o modelo a ter uma visão completa dos valores possíveis
+            unique_values = {}
+            for col in self.df.columns:
+                try:
+                    # Limitar a 1000 valores únicos para evitar tokens excessivos
+                    unique_vals = self.df[col].dropna().unique()
+                    if len(unique_vals) <= 1000:
+                        unique_values[col] = [json_serializable(val) for val in unique_vals]
+                    else:
+                        unique_values[col] = f"Mais de 1000 valores únicos ({len(unique_vals)} no total)"
+                except:
+                    unique_values[col] = "Não foi possível determinar valores únicos"
+            
+            info["valores_unicos"] = unique_values
+            
+            # Adicionar contagens para colunas categóricas
+            # Isso ajuda em consultas de contagem e distribuição
+            counts = {}
+            for col in self.df.columns:
+                try:
+                    if self.df[col].dtype == 'object' or len(self.df[col].unique()) < 50:
+                        value_counts = self.df[col].value_counts().head(50).to_dict()
+                        counts[col] = {json_serializable(k): v for k, v in value_counts.items()}
+                except:
+                    pass
+            
+            info["contagens"] = counts
+            
+            # Tenta incluir estatísticas descritivas
             try:
                 desc_df = self.df.describe(include='all')
                 info["descricao"] = {col: {idx: json_serializable(val) 
@@ -102,12 +126,6 @@ class DataFrameAnalyzer:
                                     for col in desc_df.columns}
             except Exception as e:
                 info["descricao"] = f"Não foi possível gerar estatísticas descritivas: {str(e)}"
-            
-            # Para datasets grandes, adicionar informações de amostragem
-            if len(self.df) > 10000:
-                info["nota"] = f"Dataset grande com {len(self.df)} linhas. Usando amostragem para análise."
-                sample_random = self.df.sample(n=min(1000, len(self.df)), random_state=42)
-                info["amostra_aleatoria"] = sample_random.applymap(json_serializable).to_dict(orient="records")
             
             self.df_info = info
             
@@ -118,6 +136,7 @@ class DataFrameAnalyzer:
                 "colunas": list(self.df.columns),
                 "dimensoes": self.df.shape,
                 "tipos_dados": {col: str(dtype) for col, dtype in self.df.dtypes.items()},
+                "dados_completos": self.df.applymap(lambda x: str(x)).to_dict(orient="records")
             }
     
     def chat(self, query: str) -> Any:
@@ -133,12 +152,26 @@ class DataFrameAnalyzer:
         if self.df is None:
             return "Nenhum DataFrame carregado. Por favor, carregue os dados primeiro."
         
+        # Detectar se é uma consulta de filtragem simples
+        is_filter_query = any(keyword in query.lower() for keyword in ["quais", "filtrar", "mostrar", "listar", "encontrar", "tem", "possui"])
+        
         # Converter informações do DataFrame para documentos
         df_info_str = json.dumps(self.df_info, indent=2, ensure_ascii=False)
         doc = Document(page_content=df_info_str)
         
         # Criar prompt para análise com system prompt
         system_template = self.system_prompt
+        
+        # Adicionar instruções específicas para consultas de filtragem
+        if is_filter_query:
+            system_template += """
+            IMPORTANTE: Esta parece ser uma consulta de filtragem simples.
+            1. Use TODOS os dados disponíveis em "dados_completos", não apenas amostras.
+            2. Retorne TODOS os resultados que correspondem aos critérios, sem limitar a quantidade.
+            3. Não forneça explicações ou código, apenas liste os resultados.
+            4. Certifique-se de verificar cada registro nos dados completos.
+            """
+        
         human_template = """
         Informações sobre o DataFrame:
         {context}
