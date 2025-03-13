@@ -466,6 +466,7 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "sqlalchemy" },
     { name = "streamlit" },
+    { name = "tiktoken" },
 ]
 
 [package.optional-dependencies]
@@ -496,6 +497,7 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "sqlalchemy", specifier = ">=2.0.0" },
     { name = "streamlit", specifier = ">=1.22.0" },
+    { name = "tiktoken", specifier = ">=0.9.0" },
 ]
 
 [[package]]
