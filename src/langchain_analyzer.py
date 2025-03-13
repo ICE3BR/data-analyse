@@ -65,21 +65,60 @@ class DataFrameAnalyzer:
         if self.df is None:
             return
         
+        # Função auxiliar para converter tipos não serializáveis
+        def json_serializable(obj):
+            if hasattr(obj, 'isoformat'):  # Para objetos de data/hora
+                return obj.isoformat()
+            elif pd.isna(obj):  # Para valores NaN/None
+                return None
+            else:
+                return str(obj)  # Fallback para outros tipos não serializáveis
+        
         # Coletar informações básicas
-        info = {
-            "colunas": list(self.df.columns),
-            "dimensoes": self.df.shape,
-            "tipos_dados": {col: str(dtype) for col, dtype in self.df.dtypes.items()},
-            "amostra": self.df.head(5).to_dict(orient="records"),
-            "descricao": self.df.describe().to_dict()
-        }
-        
-        # Para datasets grandes, adicionar informações de amostragem
-        if len(self.df) > 10000:
-            info["nota"] = f"Dataset grande com {len(self.df)} linhas. Usando amostragem para análise."
-            info["amostra_aleatoria"] = self.df.sample(n=min(1000, len(self.df)), random_state=42).to_dict(orient="records")
-        
-        self.df_info = info
+        try:
+            # Aumentar o número de amostras para garantir representatividade
+            sample_rows = min(20, len(self.df))  # Aumentado de 5 para 20
+            
+            # Converter o DataFrame para um formato serializável
+            sample_data = self.df.head(sample_rows).applymap(json_serializable).to_dict(orient="records")
+            
+            info = {
+                "colunas": list(self.df.columns),
+                "dimensoes": self.df.shape,
+                "tipos_dados": {col: str(dtype) for col, dtype in self.df.dtypes.items()},
+                "amostra": sample_data,
+                "total_registros": len(self.df),  # Adicionado para clareza
+            }
+            
+            # Incluir o DataFrame completo para consultas de filtragem
+            # Isso garante que todas as linhas sejam consideradas
+            info["dados_completos"] = self.df.applymap(json_serializable).to_dict(orient="records")
+            
+            # Tenta incluir estatísticas descritivas, com tratamento para tipos não numéricos
+            try:
+                desc_df = self.df.describe(include='all')
+                info["descricao"] = {col: {idx: json_serializable(val) 
+                                         for idx, val in desc_df[col].items()}
+                                    for col in desc_df.columns}
+            except Exception as e:
+                info["descricao"] = f"Não foi possível gerar estatísticas descritivas: {str(e)}"
+            
+            # Para datasets grandes, adicionar informações de amostragem
+            if len(self.df) > 10000:
+                info["nota"] = f"Dataset grande com {len(self.df)} linhas. Usando amostragem para análise."
+                sample_random = self.df.sample(n=min(1000, len(self.df)), random_state=42)
+                info["amostra_aleatoria"] = sample_random.applymap(json_serializable).to_dict(orient="records")
+            
+            self.df_info = info
+            
+        except Exception as e:
+            # Fallback para caso ainda haja problemas
+            self.df_info = {
+                "erro": f"Erro ao processar informações do DataFrame: {str(e)}",
+                "colunas": list(self.df.columns),
+                "dimensoes": self.df.shape,
+                "tipos_dados": {col: str(dtype) for col, dtype in self.df.dtypes.items()},
+            }
     
     def chat(self, query: str) -> Any:
         """
